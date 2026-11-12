@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" alt="Unhold logo" width="112"></p>
+
 # Unhold
 
 Unhold predicts which of a seller's PayPal payments are likely to get held, then fixes the causes before PayPal reacts.
