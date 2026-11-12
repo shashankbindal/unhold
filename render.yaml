@@ -1,13 +1,15 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
-# Leave the PayPal vars empty to run with the clearly-labelled offline MOCK PayPal.
+# Two services: the Unhold web app, and a Render Workflows service that runs the deep prevention scan.
+# Leave the PayPal vars empty to run with the clearly labelled offline mock PayPal.
 services:
   - type: web
     name: unhold
     runtime: node
+    region: oregon
     plan: free
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /api/model
     envVars:
       - key: GROQ_API_KEY
         sync: false
@@ -19,3 +21,20 @@ services:
         sync: false
       - key: PAYPAL_MODE
         sync: false
+      # Render API key (Account Settings > API Keys). Lets the web app trigger workflow runs.
+      - key: RENDER_API_KEY
+        sync: false
+      - key: WORKFLOW_SERVICE_SLUG
+        value: unhold-workflows
+
+  - type: workflow
+    name: unhold-workflows
+    runtime: node
+    region: oregon
+    buildCommand: npm install
+    startCommand: node workflows/main.js
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
