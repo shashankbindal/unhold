@@ -5,6 +5,9 @@ import { paypal } from "./paypal.js";
 import { assess, simulate } from "./risk.js";
 import { audit, hash } from "./audit.js";
 import { createSession, modelLabel } from "./llm.js";
+// Cycle-safe: scan.js imports loadOrders from here, but neither module uses the other at evaluation time.
+import { deepScan } from "./scan.js";
+import { GROWTH, FIX_COMBOS } from "./workflows/core.js";
 
 const STATE = "data/state.json";
 
@@ -61,18 +64,19 @@ Ground rules:
 - Public PayPal guidance: holds are typically released ~1 day after confirmed delivery when tracking from an approved carrier is on the transaction; at most 21 days. Disputes and high refund rates raise the chance of holds and limitations.
 
 Steps:
-1. Call get_risk_assessment, get_refund_notes, read_fulfillment_export and list_disputes.
+1. Call get_risk_assessment, get_refund_notes, read_fulfillment_export, list_disputes and run_deep_scan. run_deep_scan fans out on Render Workflows: per-product root causes and a growth forecast (account score at 1x-3x sales for each fix combination). If it fails, continue without it.
 2. For every order whose fix is UPLOAD_TRACKING, call upload_tracking(order_id). Code supplies the carrier and number from the seller's export.
 3. For every order whose fix is REFUND, call propose_refund(order_id, reason). This only QUEUES it for the seller's approval; code sets the amount. The reason must describe THAT order's actual situation from the data (e.g. "not shipped after 9 days"); never borrow complaints from other orders' refund notes.
 4. Read the refund notes and identify the product root cause(s): which SKU, what recurring problem, quoting notes VERBATIM as evidence.
 5. Pre-dispute interception: for every order that is unshipped or late, draft a short, honest message the seller can send the buyer (apology + status + what happens next) BEFORE the buyer opens a dispute.
-6. Call submit_report exactly once, then stop. Do not write any text after it. Plain English, short, for a non-technical seller. Lead with prevention: what will likely get held next and what to do this week.`;
+6. Call submit_report exactly once, then stop. Do not write any text after it. Plain English, short, for a non-technical seller. Lead with prevention: what will likely get held next and what to do this week. Use the deep scan's root causes alongside your own reading of the notes (evidence quotes must still be verbatim refund notes), and include one prevention_checklist item based on its growth forecast (e.g. which fixes keep the score lowest if sales double), quoting its scores exactly.`;
 
 const noInput = { type: "object", properties: {}, additionalProperties: false };
 const tools = [
   { name: "get_risk_assessment", description: "Deterministic hold-risk scores, fired rules, and the allowed fix for every live PayPal order, plus account-level metrics (spike ratio, dispute rate, refund rates by SKU, days until the refund-rate limitation line).", input_schema: noInput },
   { name: "get_refund_notes", description: "Last 30 days of refunds with the buyer's reason text, grouped by SKU.", input_schema: noInput },
   { name: "read_fulfillment_export", description: "The seller's shipping-tool export (CSV): what shipped, carrier, tracking number.", input_schema: noInput },
+  { name: "run_deep_scan", description: "Deep prevention scan on Render Workflows (preventionScan task: scores the shop, finds a root cause per flagged product, forecasts the account score at 1x/1.5x/2x/3x sales for every fix combination). Runs in-process if Render Workflows is not configured.", input_schema: noInput },
   { name: "list_disputes", description: "Open PayPal disputes on the account (PayPal Disputes API).", input_schema: noInput },
   {
     name: "upload_tracking",
@@ -140,6 +144,29 @@ const tools = [
   },
 ];
 
+// Compact deep-scan result for the model, plus the "action" feed event. Exported for tests.
+export function summarizeDeepScan(scan) {
+  const label = (key) => FIX_COMBOS.find((c) => c.key === key)?.label || key;
+  const growth = (scan.growth || GROWTH).map((m) => {
+    const rows = (scan.matrix || []).filter((r) => r.multiplier === m);
+    if (!rows.length) return null;
+    const best = rows.reduce((a, b) => (b.score < a.score ? b : a));
+    const none = rows.find((r) => r.combo === "none");
+    return { sales_multiplier: m, no_changes_score: none?.score ?? null, best_combo: label(best.combo), best_score: best.score };
+  }).filter(Boolean);
+  const out = {
+    executed_on: scan.executed_on,
+    run_id: scan.run_id || null,
+    task_runs: scan.task_runs,
+    root_causes: (scan.root_causes || []).map(({ sku, problem, evidence_quotes, recommendation }) => ({ sku, problem, evidence_quotes, recommendation })),
+    growth_forecast: growth,
+  };
+  const action = scan.executed_on === "render-workflows"
+    ? { type: "action", kind: "deep_scan", text: `Deep scan ran on Render Workflows: ${scan.task_runs} task runs (preventionScan)`, ref: scan.run_id }
+    : { type: "action", kind: "deep_scan", text: `Deep scan ran in-process (Render Workflows not configured): ${scan.task_runs} tasks` };
+  return { out, action };
+}
+
 async function runTool(name, input, ctx, emit) {
   const findOrder = (id) => ctx.assessment.orders.find((o) => o.orderId === id);
   switch (name) {
@@ -157,6 +184,14 @@ async function runTool(name, input, ctx, emit) {
     }
     case "read_fulfillment_export":
       return fs.readFileSync("data/fulfillment.csv", "utf8");
+    case "run_deep_scan": {
+      // Started by code at the beginning of every run (see runAgent); this returns its result.
+      // A failure (e.g. Render API error) becomes a tool error so the model continues without it.
+      ctx.scanSeen = true;
+      const r = await ctx.scan;
+      if (r.error) throw Object.assign(new Error(`Deep scan failed: ${r.error}`), { reported: true });
+      return r.out;
+    }
     case "list_disputes": {
       try {
         const d = await paypal.listDisputes();
@@ -189,6 +224,7 @@ async function runTool(name, input, ctx, emit) {
     case "submit_report": {
       const undone = ctx.assessment.orders.filter((o) => o.fix?.type === "UPLOAD_TRACKING" && !ctx.done?.has(o.orderId));
       if (undone.length) throw new Error(`Not finished: call upload_tracking for ${undone.map((o) => o.orderId).join(", ")} first, then submit_report.`);
+      if (!ctx.scanSeen && !(await ctx.scan).error) throw new Error("Not finished: call run_deep_scan first and use its root causes and growth forecast in the report, then submit_report.");
       // Code check: keep only evidence quotes that appear verbatim in the stored refund notes.
       // Normalize: open models don't always follow the schema exactly.
       const arr = (x) => (Array.isArray(x) ? x : []);
@@ -211,46 +247,57 @@ async function runTool(name, input, ctx, emit) {
   }
 }
 
-export async function runAgent(emit) {
+export async function runAgent(emit, { deepScan: scanFn = deepScan } = {}) {
   const ctx = { assessment: await currentAssessment() };
   audit("code", "ASSESS_BEFORE", { account_score: ctx.assessment.account.score });
   emit({ type: "assessment", phase: "before", data: ctx.assessment });
 
-  emit({ type: "thought", text: `Model: ${modelLabel()}` });
-  const session = createSession({
-    system: SYSTEM,
-    tools,
-    userMessage: "Some of my PayPal money is on hold and I'm scared my account will get limited. Check everything, fix what you can, and tell me what to do so it doesn't happen again.",
-  });
-  let reported = false;
-  for (let turn = 0; turn < 20; turn++) {
-    const { texts, calls, stop } = await session.next();
-    for (const t of texts) emit({ type: "thought", text: t });
-    if (stop === "refusal") { emit({ type: "error", text: "The model declined this request." }); break; }
-    if (stop !== "tool_use") {
-      // Some models stop without calling submit_report; nudge once, then give up.
-      if (reported || ctx.nudged) break;
-      ctx.nudged = true;
-      session.say("You have not finished. Complete any remaining steps, then call submit_report exactly once.");
-      continue;
-    }
-    const results = [];
-    for (const c of calls) {
-      emit({ type: "tool", name: c.name, input: c.input });
-      try {
-        if (c.input?.__invalid_json !== undefined) throw new Error("Tool arguments were not valid JSON. Call the tool again with valid JSON.");
-        const out = await runTool(c.name, c.input, ctx, emit);
-        if (c.name === "submit_report") reported = true;
-        results.push({ id: c.id, content: typeof out === "string" ? out : JSON.stringify(out) });
-      } catch (e) {
-        emit({ type: "error", text: `${c.name}: ${e.message.slice(0, 200)}` });
-        results.push({ id: c.id, content: e.message.slice(0, 1000), isError: true });
-      }
-    }
-    if (reported) break; // the report is the final output; don't wait for extra prose
-    session.addResults(results);
-  }
+  // Code, not the model, decides that every run triggers the deep scan (a Render Workflows run when configured).
+  // It runs in the background while the model works; the run_deep_scan tool waits for it. deepScan audits itself.
+  emit({ type: "thought", text: "Starting deep prevention scan (Render Workflows preventionScan)..." });
+  ctx.scan = Promise.resolve().then(scanFn).then(
+    (scan) => { const { out, action } = summarizeDeepScan(scan); emit(action); return { out }; },
+    (e) => { const error = String(e?.message || e).slice(0, 300); emit({ type: "error", text: `Deep scan failed: ${error}` }); return { error }; },
+  );
 
+  try {
+    emit({ type: "thought", text: `Model: ${modelLabel()}` });
+    const session = createSession({
+      system: SYSTEM,
+      tools,
+      userMessage: "Some of my PayPal money is on hold and I'm scared my account will get limited. Check everything, fix what you can, and tell me what to do so it doesn't happen again.",
+    });
+    let reported = false;
+    for (let turn = 0; turn < 20; turn++) {
+      const { texts, calls, stop } = await session.next();
+      for (const t of texts) emit({ type: "thought", text: t });
+      if (stop === "refusal") { emit({ type: "error", text: "The model declined this request." }); break; }
+      if (stop !== "tool_use") {
+        // Some models stop without calling submit_report; nudge once, then give up.
+        if (reported || ctx.nudged) break;
+        ctx.nudged = true;
+        session.say("You have not finished. Complete any remaining steps, then call submit_report exactly once.");
+        continue;
+      }
+      const results = [];
+      for (const c of calls) {
+        emit({ type: "tool", name: c.name, input: c.input });
+        try {
+          if (c.input?.__invalid_json !== undefined) throw new Error("Tool arguments were not valid JSON. Call the tool again with valid JSON.");
+          const out = await runTool(c.name, c.input, ctx, emit);
+          if (c.name === "submit_report") reported = true;
+          results.push({ id: c.id, content: typeof out === "string" ? out : JSON.stringify(out) });
+        } catch (e) {
+          if (!e.reported) emit({ type: "error", text: `${c.name}: ${e.message.slice(0, 200)}` });
+          results.push({ id: c.id, content: e.message.slice(0, 1000), isError: true });
+        }
+      }
+      if (reported) break; // the report is the final output; don't wait for extra prose
+      session.addResults(results);
+    }
+  } finally {
+    await ctx.scan; // never rejects; the scan always finishes (and emits its event) before the run ends
+  }
   const after = await currentAssessment();
   audit("code", "ASSESS_AFTER", { account_score: after.account.score });
   emit({ type: "assessment", phase: "after", data: after });

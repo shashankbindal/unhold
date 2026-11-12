@@ -553,7 +553,7 @@
         log('tool', '<code>' + esc(ev.name) + '</code> <span class="m">' + esc(JSON.stringify(ev.input || {}).slice(0, 110)) + '</span>');
       }
       if (ev.type === 'thought') log('thought', esc(ev.text));
-      if (ev.type === 'action') { log('action', esc(ev.text) + ' <span class="m">(' + esc(ev.ref) + ')</span>'); loadAudit(); }
+      if (ev.type === 'action') { log('action', esc(ev.text) + (ev.ref ? ' <span class="m">(' + (ev.kind === 'deep_scan' ? 'run ' : '') + esc(ev.ref) + ')</span>' : '')); loadAudit(); }
       if (ev.type === 'approval') {
         log('approval', 'Refund of ' + esc(usd2(ev.amount)) + ' for ' + esc(ev.item) + ' queued for your approval');
         S.approvals[ev.id] = { ev: ev, status: 'pending' }; renderApprovals(); renderDrawer();
