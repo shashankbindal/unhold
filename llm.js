@@ -76,8 +76,8 @@ function groqSession(system, tools, userMessage) {
   const messages = [{ role: "system", content: system }, { role: "user", content: userMessage }];
   return {
     async next() {
-      let r, j;
-      for (let attempt = 0; attempt < 6; attempt++) {
+      let r, j, compactLevel = 0;
+      for (let attempt = 0; attempt < 8; attempt++) {
         r = await fetch(`${base}/chat/completions`, {
           method: "POST",
           headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
@@ -91,6 +91,18 @@ function groqSession(system, tools, userMessage) {
           dailyFallbackUntil = Date.now() + 60 * 60 * 1000;
           model = FALLBACK_MODEL();
           continue; // retry immediately on the fallback model
+        }
+        // Free-tier per-minute token limits reject large requests outright (413). Shrink older tool results and retry.
+        const tooLarge = r.status === 413 || /request too large/i.test(j?.error?.message || "");
+        if (tooLarge && compactLevel < 2) {
+          compactLevel++;
+          const keep = compactLevel === 1 ? 900 : 300;
+          const toolIdx = messages.map((m, i) => (m.role === "tool" ? i : -1)).filter((i) => i >= 0);
+          for (const i of toolIdx.slice(0, compactLevel === 1 ? -2 : undefined)) {
+            const c = String(messages[i].content);
+            if (c.length > keep) messages[i] = { ...messages[i], content: c.slice(0, keep) + " …[truncated to fit the model's request size limit]" };
+          }
+          continue;
         }
         if (r.status !== 429 && r.status < 500 && !malformedToolCall) break;
         // Free-tier TPM limits are tight (the deep scan's root-cause calls share the key): honor "try again in Xs".
