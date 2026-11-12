@@ -7,11 +7,15 @@
   "scripts": {
     "start": "node server.js",
     "seed": "node seed.js create",
-    "seed:capture": "node seed.js capture"
+    "seed:capture": "node seed.js capture",
+    "workflows": "node workflows/main.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
+    "@renderinc/sdk": "^1.8.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.1"
   }

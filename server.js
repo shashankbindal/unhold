@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { runAgent, approve, currentAssessment, whatIf, pendingApprovals, rawOrder, historySeries } from "./agent.js";
 import { seedMockDemo, ensureDemoData } from "./demo.js";
+import { deepScan, workflowsConfigured } from "./scan.js";
 import { modelLabel } from "./llm.js";
 import { PAYPAL_MODE } from "./paypal.js";
 import { readAudit } from "./audit.js";
@@ -22,6 +23,7 @@ app.get("/api/config", (req, res) => res.json({
   paypal: PAYPAL_MODE,
   model: modelLabel(),
   // Only whether keys are configured. Secret values never leave the server.
+  workflows: workflowsConfigured() ? { enabled: true, slug: process.env.WORKFLOW_SERVICE_SLUG } : { enabled: false },
   keys: { paypal: Boolean(process.env.PAYPAL_CLIENT_ID), groq: Boolean(process.env.GROQ_API_KEY), anthropic: Boolean(process.env.ANTHROPIC_API_KEY) },
   endpoints: [
     { api: "OAuth 2.0", method: "POST", path: "/v1/oauth2/token", used_for: "Access token (client credentials)" },
@@ -34,6 +36,13 @@ app.get("/api/config", (req, res) => res.json({
 }));
 app.get("/api/order/:id", async (req, res) => {
   try { res.json(await rawOrder(req.params.id)); } catch (e) { res.status(404).json({ error: e.message }); }
+});
+// Deep prevention scan: fans out on Render Workflows (or runs locally if not configured).
+let scanning = false;
+app.post("/api/deep-scan", async (req, res) => {
+  if (scanning) return res.status(409).json({ error: "A scan is already running." });
+  scanning = true;
+  try { res.json(await deepScan()); } catch (e) { res.status(500).json({ error: e.message }); } finally { scanning = false; }
 });
 app.get("/api/history", (req, res) => res.json(historySeries()));
 app.get("/api/model", (req, res) => res.json({ model: modelLabel(), paypal: PAYPAL_MODE }));
