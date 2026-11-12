@@ -6,8 +6,7 @@ export const RULES = [
   { id: "UNSHIPPED", source: "Your shipping export", points: 15, label: "Not shipped yet after 2+ days" },
   { id: "NO_TRACKING", source: "PayPal (live) + your export", points: 25, label: "Shipped, but no tracking on the PayPal transaction" },
   { id: "HIGH_TICKET", source: "PayPal (live)", points: 20, label: "Order is more than 2× your median order value" },
-  { id: "SALES_SPIKE_EXTREME", source: "PayPal orders + simulated history", points: 25, label: "Sales are more than 4× your 30-day baseline" },
-  { id: "SALES_SPIKE", source: "PayPal orders + simulated history", points: 15, label: "Recent sales are more than 2× your 30-day baseline" },
+  { id: "SALES_SPIKE", source: "PayPal orders + simulated history", points: 35, label: "Sales spike vs your 30-day baseline (5 points per 1× of spike above 2×, max 35)" },
   { id: "SKU_REFUNDS", source: "Simulated history", points: 15, label: "This product's refund rate is more than 2× your shop average" },
   { id: "DISPUTE_RATE", source: "Simulated history", points: 10, label: "Your dispute rate is above 1%" },
   { id: "NEW_ACCOUNT", source: "Simulated history", points: 10, label: "Account is younger than 90 days" },
@@ -53,14 +52,14 @@ export function assess(orders, history, overrides = {}) {
     else if (!o.shipped && o.daysAgo >= 2) fired.push("UNSHIPPED");
     if (o.shipped && !(o.trackersOnPayPal?.length)) fired.push("NO_TRACKING");
     if (Number(o.amount) > 2 * med) fired.push("HIGH_TICKET");
-    if (spikeRatio > 4) fired.push("SALES_SPIKE_EXTREME");
-    else if (spikeRatio > 2) fired.push("SALES_SPIKE");
+    if (spikeRatio > 2) fired.push("SALES_SPIKE");
     // Needs a minimum sample (3+ refunds) so one refund on a small product isn't flagged as a pattern.
     if ((stats[o.sku]?.vs_shop || 0) > 2 && (stats[o.sku]?.refunds || 0) >= 3) fired.push("SKU_REFUNDS");
     if (disputeRate > 0.01) fired.push("DISPUTE_RATE");
     if (history.account_age_days < 90) fired.push("NEW_ACCOUNT");
 
-    const risk = Math.min(100, fired.reduce((s, id) => s + RULE[id].points, 0));
+    const pts = (id) => (id === "SALES_SPIKE" ? Math.min(35, Math.round(5 * spikeRatio)) : RULE[id].points);
+    const risk = Math.min(100, fired.reduce((s, id) => s + pts(id), 0));
     // The ONLY fixes the agent is allowed to execute or propose, decided here in code:
     let fix = null;
     if (fired.includes("NO_TRACKING") && o.tracking) fix = { type: "UPLOAD_TRACKING", carrier: o.carrier, tracking_number: o.tracking };
@@ -69,7 +68,7 @@ export function assess(orders, history, overrides = {}) {
       ...o,
       risk,
       level: risk >= 60 ? "high" : risk >= 35 ? "medium" : "low",
-      factors: fired.map((id) => ({ id, points: RULE[id].points, label: RULE[id].label, source: RULE[id].source })).sort((a, b) => b.points - a.points),
+      factors: fired.map((id) => ({ id, points: pts(id), label: id === "SALES_SPIKE" ? `Sales are ${spikeRatio}× your 30-day baseline` : RULE[id].label, source: RULE[id].source })).sort((a, b) => b.points - a.points),
       fix,
     };
   });
