@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23003087%27/%3E%3Cpath d=%27M16 6l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V9z%27 fill=%27none%27 stroke=%27white%27 stroke-width=%272.2%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<title>Unhold</title>
+<meta name="description" content="Unhold predicts which of your PayPal payments will get held, before they do, and fixes the cause.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell" id="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sb-top">
+      <a class="wordmark" href="#/overview"><span class="logo" data-icon="logo" data-size="20"></span><span class="sb-label">Unhold</span></a>
+      <button class="icon-btn sb-collapse" id="sbCollapse" aria-label="Collapse sidebar" title="Collapse sidebar"><span data-icon="collapse"></span></button>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#/overview" data-route="overview"><span data-icon="overview" data-size="18"></span><span class="sb-label">Overview</span></a>
+      <a href="#/orders" data-route="orders"><span data-icon="orders" data-size="18"></span><span class="sb-label">Orders</span><span class="nav-count sb-label" id="navHigh"></span></a>
+      <a href="#/forecast" data-route="forecast"><span data-icon="forecast" data-size="18"></span><span class="sb-label">Forecast</span></a>
+      <a href="#/agent" data-route="agent"><span data-icon="agent" data-size="18"></span><span class="sb-label">Agent &amp; Rules</span><span class="nav-count amber sb-label" id="navAppr"></span></a>
+      <a href="#/settings" data-route="settings"><span data-icon="settings" data-size="18"></span><span class="sb-label">Audit &amp; Settings</span></a>
+    </nav>
+    <div class="sb-env"><span class="env-badge" id="envBadge"><span class="dot"></span><span class="sb-label" id="envText">Connecting</span></span></div>
+    <div class="sb-profile">
+      <div class="avatar">MC</div>
+      <div class="sb-label"><div class="p-name">Maya Chen</div><div class="p-org">Maya's Candle Co.</div></div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open navigation"><span data-icon="menu" data-size="18"></span></button>
+      <nav class="crumbs" aria-label="Breadcrumb"><span>Maya's Candle Co.</span><span data-icon="chevronRight" data-size="14"></span><b id="crumb">Overview</b></nav>
+      <div class="top-tools">
+        <label class="search"><span data-icon="search"></span><input id="gSearch" type="search" placeholder="Search orders" aria-label="Search orders by ID or item"></label>
+        <select id="range" class="select" aria-label="Date range"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option></select>
+        <button class="btn secondary" id="reset" hidden><span data-icon="reset"></span><span class="hide-sm">Reset demo</span></button>
+        <button class="btn primary" id="run"><span class="spin" aria-hidden="true"></span><span data-icon="play" class="run-ic"></span><span id="runTxt">Run Unhold agent</span></button>
+      </div>
+    </header>
+
+    <div class="banner" id="banner" hidden><span data-icon="info"></span><div id="bannerTxt"></div></div>
+
+    <main class="content">
+      <!-- OVERVIEW -->
+      <section class="page" id="page-overview" data-title="Overview">
+        <div class="page-head">
+          <div><h1>Overview</h1><p class="lede">Predicts which of your PayPal payments will get held, before they do, and fixes the cause.</p></div>
+          <div class="triad"><span><b>Prevent</b></span><span><b>Diagnose</b></span><span><b>Fix</b></span><em>Code decides. AI explains. You approve.</em></div>
+        </div>
+        <div class="kpis" id="kpis">
+          <div class="card kpi skel-card"></div><div class="card kpi skel-card"></div><div class="card kpi skel-card"></div><div class="card kpi skel-card"></div>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-h"><h2>Account hold risk</h2><span class="pill neutral">Code-scored</span></div>
+            <div class="gauge-wrap" id="gauge"><div class="skel" style="height:150px"></div></div>
+            <p class="muted small" id="headline"></p>
+          </div>
+          <div class="card"><div class="card-h"><h2>Risk points by cause</h2><span class="muted small">open orders</span></div><div id="chartFactors" class="chart"><div class="skel" style="height:180px"></div></div></div>
+          <div class="card"><div class="card-h"><h2>Refund rate by product</h2><span class="muted small">vs shop average</span></div><div id="chartSku" class="chart"><div class="skel" style="height:180px"></div></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card flush">
+            <div class="card-h pad"><h2>Recent activity</h2><a href="#/settings" class="link">View audit log</a></div>
+            <div class="table-wrap" id="recentActivity"><div class="skel-rows"></div></div>
+          </div>
+          <div class="card flush">
+            <div class="card-h pad"><h2>Orders needing attention</h2><a href="#/orders" class="link">All orders</a></div>
+            <div class="table-wrap" id="attention"><div class="skel-rows"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section class="page" id="page-orders" data-title="Orders" hidden>
+        <div class="page-head"><div><h1>Orders</h1><p class="lede">Every live PayPal order, scored by deterministic rules. Click a row for the evidence.</p></div></div>
+        <div class="card flush">
+          <div class="filters">
+            <label class="search grow"><span data-icon="search"></span><input id="oSearch" type="search" placeholder="Order ID or item" aria-label="Filter orders"></label>
+            <div class="seg" id="levelSeg" role="group" aria-label="Risk level">
+              <button data-level="all" class="on">All</button><button data-level="high">High</button><button data-level="medium">Medium</button><button data-level="low">Low</button><button data-level="resolved">Resolved</button>
+            </div>
+            <select id="fixFilter" class="select" aria-label="Fix filter">
+              <option value="all">All fix states</option><option value="UPLOAD_TRACKING">Upload tracking</option><option value="REFUND">Refund needs approval</option><option value="none">No action needed</option>
+            </select>
+            <button class="btn secondary" id="exportCsv"><span data-icon="download"></span>Export CSV</button>
+          </div>
+          <div class="table-wrap"><table class="tbl sortable" id="ordersTbl">
+            <thead><tr>
+              <th data-sort="orderId">Order ID</th><th data-sort="daysAgo" class="num">Age</th><th data-sort="item">Item</th><th data-sort="sku">SKU</th>
+              <th data-sort="amount" class="num">Amount</th><th data-sort="risk">Risk</th><th>Top factor</th><th>Fix status</th>
+            </tr></thead>
+            <tbody id="ordersBody"><tr><td colspan="8"><div class="skel-rows"></div></td></tr></tbody>
+          </table></div>
+          <div class="tbl-foot muted small" id="ordersFoot"></div>
+        </div>
+      </section>
+
+      <!-- FORECAST -->
+      <section class="page" id="page-forecast" data-title="Forecast" hidden>
+        <div class="page-head"><div><h1>Forecast</h1><p class="lede">See how fixes and sales growth move your hold risk, using the same rules the agent uses.</p></div></div>
+        <div class="card"><div class="card-h"><h2>Risk per order, before and after the agent</h2><span class="muted small" id="ordersChartNote">Hollow dot = before, filled = now</span></div><div id="chartOrders" class="chart"><div class="skel" style="height:220px"></div></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-h"><h2>What-if simulator</h2><span class="pill neutral">Deterministic</span></div>
+            <label class="toggle"><input type="checkbox" id="w_track"><span class="sw"></span><span><span class="t">Upload tracking for every shipped order</span><span class="s">PayPal typically releases holds after confirmed delivery</span></span></label>
+            <label class="toggle"><input type="checkbox" id="w_late"><span class="sw"></span><span><span class="t">Resolve late, unshipped orders</span><span class="s">Ship or refund before the buyer opens a dispute</span></span></label>
+            <label class="toggle"><input type="checkbox" id="w_sku"><span class="sw"></span><span><span class="t">Fix the problem product (<span id="w_skuname">top refund SKU</span>)</span><span class="s">For example better packaging, so refunds fall back to normal</span></span></label>
+            <div class="slider"><div class="row"><span>Sales next week</span><b id="w_multv" class="tnum">1x current pace</b></div>
+              <input type="range" id="w_mult" min="1" max="4" step="0.5" value="1" aria-label="Sales next week, as a multiple of current pace"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Projected outcome</h2><span class="muted small">vs current</span></div>
+            <div class="simrows">
+              <div class="simrow"><span>Hold-risk score</span><span class="v" id="s_score">-</span></div>
+              <div class="simrow"><span>At high risk of a hold</span><span class="v" id="s_risk">-</span></div>
+              <div class="simrow"><span>Days to limitation-risk line</span><span class="v" id="s_line">-</span></div>
+            </div>
+            <div class="explainer"><span data-icon="info"></span><div><b>Limitation-risk line.</b> Unhold projects your refund rate forward at the current pace. The line is the point where refunds plus disputes reach a level that commonly triggers account reviews. It is a heuristic estimate, not a PayPal threshold.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AGENT -->
+      <section class="page" id="page-agent" data-title="Agent & Rules" hidden>
+        <div class="page-head"><div><h1>Agent &amp; Rules</h1><p class="lede">Code decides. AI explains. You approve.</p></div></div>
+        <div class="card">
+          <div class="stepper" id="stepper">
+            <div class="step" id="st1"><span class="sn">1</span><span><b>Score</b><small>Deterministic code</small></span></div>
+            <div class="step" id="st2"><span class="sn">2</span><span><b>Investigate</b><small>Read orders and notes</small></span></div>
+            <div class="step" id="st3"><span class="sn">3</span><span><b>Fix</b><small>Tracking, refunds</small></span></div>
+            <div class="step" id="st4"><span class="sn">4</span><span><b>Report</b><small>Explain and prevent</small></span></div>
+          </div>
+          <p class="summary" id="summary" hidden></p>
+        </div>
+        <div class="grid-2 agent-grid">
+          <div class="card flush"><div class="card-h pad"><h2>Live activity</h2><span class="muted small" id="runState">Idle</span></div>
+            <div class="feed" id="log" aria-live="polite"><div class="empty">Press <b>Run Unhold agent</b> to start. A run takes about 1 to 2 minutes; you can switch pages while it works.</div></div></div>
+          <div class="card"><div class="card-h"><h2>Needs your approval</h2></div>
+            <div id="approvals"><div class="empty">Nothing to approve.</div></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-h"><h2>Product root cause</h2><span class="pill ai">AI inference</span></div><div id="skus"><div class="empty">Run the agent to analyse refund notes.</div></div></div>
+          <div class="card"><div class="card-h"><h2>Prevention checklist</h2></div><div id="checklist"><div class="empty">Run the agent to build your checklist.</div></div></div>
+        </div>
+        <div class="card"><div class="card-h"><h2>Buyer message drafts</h2><span class="pill ai">AI draft</span></div><div id="msgs" class="msgs"><div class="empty">Run the agent to draft messages.</div></div></div>
+        <div class="card flush">
+          <div class="card-h pad"><h2>Rules engine</h2><span class="pill neutral">Read-only</span></div>
+          <p class="note pad-x">Rules are deterministic code (risk.js); the AI cannot change scores or amounts.</p>
+          <div class="table-wrap" id="rules"><div class="skel-rows"></div></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page" id="page-settings" data-title="Audit & Settings" hidden>
+        <div class="page-head"><div><h1>Audit &amp; Settings</h1><p class="lede">Every action, the exact payload hash, and how this environment is wired.</p></div></div>
+        <div class="tabs" role="tablist" id="tabs">
+          <button role="tab" data-tab="audit" class="on">Audit log</button><button role="tab" data-tab="env">Environment</button><button role="tab" data-tab="apis">PayPal APIs used</button><button role="tab" data-tab="guard">Guardrails</button>
+        </div>
+        <div class="card flush tabpanel" id="tab-audit"><div class="table-wrap" id="audit"><div class="skel-rows"></div></div></div>
+        <div class="card tabpanel" id="tab-env" hidden><div id="envInfo"><div class="skel-rows"></div></div></div>
+        <div class="card flush tabpanel" id="tab-apis" hidden><div class="table-wrap" id="apis"><div class="skel-rows"></div></div></div>
+        <div class="card tabpanel" id="tab-guard" hidden>
+          <ul class="guard">
+            <li><span data-icon="code"></span><div><b>Code decides.</b> Risk scores, amounts and fixes are computed by deterministic rules. The model only reads them.</div></li>
+            <li><span data-icon="sparkle"></span><div><b>AI explains.</b> Explanations, root causes and buyer drafts are labelled as AI inference and quote your own data verbatim.</div></li>
+            <li><span data-icon="hand"></span><div><b>You approve.</b> Any action that moves money (refunds) waits for your explicit approval.</div></li>
+            <li><span data-icon="lock"></span><div><b>Hash-bound approvals.</b> Each approval is bound to a sha256 of the exact {order, capture, amount} payload; a changed payload cannot be executed.</div></li>
+            <li><span data-icon="upload"></span><div><b>Low-risk writes only.</b> Without approval the agent can only add tracking numbers that already exist in your shipping export.</div></li>
+            <li><span data-icon="file"></span><div><b>Full audit trail.</b> Every assessment, tool call and PayPal write is logged with its payload hash.</div></li>
+            <li><span data-icon="xCircle"></span><div><b>Cannot release holds.</b> Unhold does not know or influence PayPal's internal risk decisions.</div></li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Unhold infers likely hold risk from your own order, refund and dispute data using a transparent heuristic. It does not know or influence PayPal's internal risk decisions. Holds in this demo are simulated because the PayPal sandbox does not withhold funds. Every action that moves money needs your approval.</p>
+    </footer>
+  </div>
+</div>
+
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Order details">
+  <div class="drawer-h">
+    <div><div class="drawer-title" id="dTitle">Order</div><div class="drawer-sub" id="dSub"></div></div>
+    <button class="icon-btn" id="dClose" aria-label="Close details"><span data-icon="x" data-size="18"></span></button>
+  </div>
+  <div class="drawer-b" id="dBody"></div>
+</aside>
+<div class="drawer-scrim" id="dScrim"></div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script src="icons.js"></script>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
