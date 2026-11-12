@@ -43,11 +43,11 @@ export function forecastGrowthCore(snapshot, multiplier) {
 export async function rootCauseForSkuCore(sku, notes, stats, env = process.env) {
   if (!env.GROQ_API_KEY) return { sku, problem: "AI key not configured on this service", evidence_quotes: [], recommendation: "", stats };
   const base = env.GROQ_BASE || "https://api.groq.com/openai/v1";
-  const r = await fetch(`${base}/chat/completions`, {
+  const call = (model) => fetch(`${base}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${env.GROQ_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: env.GROQ_MODEL || "openai/gpt-oss-120b",
+      model,
       temperature: 0.2,
       reasoning_effort: "low",
       response_format: { type: "json_object" },
@@ -57,8 +57,14 @@ export async function rootCauseForSkuCore(sku, notes, stats, env = process.env) 
       ],
     }),
   });
+  let r = await call(env.GROQ_MODEL || "openai/gpt-oss-120b");
+  let j = await r.json().catch(() => ({}));
+  // Daily quota exhausted on the primary model: use the fallback model (separate quota) instead of failing.
+  if (r.status === 429 && /per day|(TPD)|(RPD)/i.test(j?.error?.message || "")) {
+    r = await call(env.GROQ_FALLBACK_MODEL || "openai/gpt-oss-20b");
+    j = await r.json().catch(() => ({}));
+  }
   if (r.status === 429 || r.status >= 500) throw new Error(`Groq ${r.status}: retrying`);
-  const j = await r.json();
   if (!r.ok) throw new Error(`Groq ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
   let out;
   try { out = JSON.parse(j.choices[0].message.content); } catch { throw new Error("Model returned invalid JSON: retrying"); }

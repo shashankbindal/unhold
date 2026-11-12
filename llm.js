@@ -14,7 +14,7 @@ export function providerName() {
 export function modelLabel() {
   const p = providerName();
   if (p === "claude") return "Claude (claude-opus-5-5)";
-  if (p === "groq") return `${process.env.GROQ_MODEL || "openai/gpt-oss-120b"} on Groq`;
+  if (p === "groq") return `${currentGroqModel()} on Groq`;
   return "no model configured";
 }
 
@@ -59,8 +59,18 @@ function claudeSession(system, tools, userMessage) {
   };
 }
 
+// When the primary model's DAILY quota is exhausted, switch to a fallback model (separate quota) for an hour
+// instead of failing the run in front of a user.
+const FALLBACK_MODEL = () => process.env.GROQ_FALLBACK_MODEL || "openai/gpt-oss-20b";
+let dailyFallbackUntil = 0;
+export const isDailyQuotaError = (status, j) => status === 429 && /per day|(TPD)|(RPD)/i.test(j?.error?.message || "");
+export function currentGroqModel() {
+  const primary = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+  return Date.now() < dailyFallbackUntil ? FALLBACK_MODEL() : primary;
+}
+
 function groqSession(system, tools, userMessage) {
-  const model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+  let model = currentGroqModel();
   const base = process.env.GROQ_BASE || "https://api.groq.com/openai/v1";
   const fnTools = tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } }));
   const messages = [{ role: "system", content: system }, { role: "user", content: userMessage }];
@@ -77,6 +87,11 @@ function groqSession(system, tools, userMessage) {
         // gpt-oss occasionally emits a malformed tool call (e.g. a tool named "commentary"); Groq rejects it with
         // 400 tool_use_failed. Sampling again usually succeeds.
         const malformedToolCall = r.status === 400 && j?.error?.code === "tool_use_failed";
+        if (isDailyQuotaError(r.status, j) && model !== FALLBACK_MODEL()) {
+          dailyFallbackUntil = Date.now() + 60 * 60 * 1000;
+          model = FALLBACK_MODEL();
+          continue; // retry immediately on the fallback model
+        }
         if (r.status !== 429 && r.status < 500 && !malformedToolCall) break;
         // Free-tier TPM limits are tight (the deep scan's root-cause calls share the key): honor "try again in Xs".
         const hint = Number(/try again in ([\d.]+)s/.exec(j?.error?.message || "")?.[1]);
