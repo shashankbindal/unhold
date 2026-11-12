@@ -1,0 +1,8 @@
+.env
+data/audit.jsonl
+data/fulfillment.csv
+data/mock-paypal.json
+data/orders.json
+data/pending.json
+data/state.json
+node_modules/
