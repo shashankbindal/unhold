@@ -1,0 +1,20 @@
+{
+  "_note": "SIMULATED 30-day shop history for the demo seller (synthetic; labelled as such in the UI). Live PayPal sandbox orders come from data/orders.json.",
+  "shop": "Maya's Candle Co.",
+  "account_age_days": 64,
+  "baseline_daily_sales_usd": 120,
+  "orders_30d": 118,
+  "disputes_30d": 2,
+  "sku_orders_30d": { "LAV-4": 41, "GIFT-DLX": 12, "CED-2": 33, "FAV-40": 4, "WAX-KIT": 22, "SAMPLE": 6 },
+  "refunds_30d": [
+    { "sku": "WAX-KIT", "days_ago": 2, "amount": 96, "note": "Wax arrived completely melted and leaked through the box" },
+    { "sku": "WAX-KIT", "days_ago": 3, "amount": 96, "note": "The glass jar was cracked on arrival, wax everywhere" },
+    { "sku": "WAX-KIT", "days_ago": 4, "amount": 96, "note": "melted in transit, unusable" },
+    { "sku": "WAX-KIT", "days_ago": 5, "amount": 48, "note": "Wicks missing from kit" },
+    { "sku": "WAX-KIT", "days_ago": 6, "amount": 96, "note": "Box crushed, jar broken. Shipping was 9 days" },
+    { "sku": "WAX-KIT", "days_ago": 9, "amount": 96, "note": "wax melted, smells fine but impossible to use" },
+    { "sku": "LAV-4", "days_ago": 12, "amount": 37, "note": "One candle scent too weak" },
+    { "sku": "CED-2", "days_ago": 20, "amount": 38, "note": "Changed my mind" },
+    { "sku": "GIFT-DLX", "days_ago": 25, "amount": 320, "note": "Gift arrived after the birthday" }
+  ]
+}
