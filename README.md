@@ -25,7 +25,7 @@ With only a Groq key, the app runs against a built-in offline copy of the PayPal
 ### A three-minute walkthrough
 
 1. **Overview.** Look at the account risk score, the orders most likely to be held, and the charts showing what drives the risk.
-2. **Forecast.** Switch on the what-if options (upload all tracking, resolve late orders, fix the problem product, or a sales surge next week) and watch the score change.
+2. **Forecast.** Click **Run deep scan**. It tests every combination of fixes against sales growth and shows which ones keep the shop out of the high-risk zone. Below it, the what-if options (upload all tracking, resolve late orders, fix the problem product, or a sales surge next week) let you try one scenario at a time.
 3. **Agent & Rules.** Click **Run Unhold agent**. Every tool call and PayPal response streams into the activity feed.
 4. **Approve.** Approve the refund the agent proposes. The score drops (66 to 43 in the demo shop), and the Overview updates.
 5. **Orders.** Click any order to see why it scored the way it did, where each piece of evidence came from, its timeline, and the raw PayPal order.
@@ -56,8 +56,7 @@ Unhold splits responsibilities: code decides, the model explains, and the seller
 | Not shipped after 2+ days | 15 |
 | Shipped, but no tracking on the PayPal transaction | 25 |
 | Order more than 2× the median order value | 20 |
-| Sales more than 4× the 30-day baseline | 25 |
-| Sales more than 2× the 30-day baseline | 15 |
+| Sales spike above 2× the 30-day baseline | 5 per 1× of spike, max 35 |
 | Product refund rate more than 2× the shop average (3+ refunds) | 15 |
 | Dispute rate above 1% | 10 |
 | Account younger than 90 days | 10 |
@@ -65,6 +64,23 @@ Unhold splits responsibilities: code decides, the model explains, and the seller
 The score is capped at 100. Medium starts at 35 and high at 60. The rules follow PayPal's public guidance: holds are usually released about a day after confirmed delivery when tracking is on the transaction, and unusual selling patterns, new accounts, disputes and refunds can all lead to holds ([release a hold](https://www.paypal.com/smarthelp/article/faq3743), [money holds](https://www.paypal.com/us/webapps/mpp/money-holds)).
 
 ![Order detail](docs/screenshots/order-drawer.png)
+
+### Deep prevention scan on Render Workflows
+
+The deep scan answers a planning question: if sales grow, which fixes keep the shop out of hold territory? It runs as a Render Workflow (`workflows/main.js`):
+
+```
+preventionScan(snapshot)
+ ├─ scoreShop(snapshot)                          current score and flagged products
+ ├─ rootCauseForSku(sku, notes, stats)  × N      model call per problem product, retried with backoff
+ └─ forecastGrowth(snapshot, 1× / 1.5× / 2× / 3×) 8 fix combinations at each growth level
+```
+
+Each task runs on its own Render instance and in parallel. `rootCauseForSku` retries up to 4 times with exponential backoff, which absorbs model rate limits. Workflow instances don't share the web service's disk, so the web app sends a snapshot of the shop as the task input. Every run appears in the Render dashboard.
+
+When `RENDER_API_KEY` and `WORKFLOW_SERVICE_SLUG` aren't set (for example in local development), `scan.js` runs the same task code in-process, and the card says so.
+
+![Deep scan](docs/screenshots/deep-scan.png)
 
 ### What it does not claim
 
@@ -86,6 +102,7 @@ The score is capped at 100. Medium starts at 35 and high at 60. The rules follow
 
 - **AI model:** `openai/gpt-oss-120b`, served by Groq through its OpenAI-compatible chat completions API with tool calling. It explains the risk scores, finds product root causes in refund notes, drafts buyer messages, and runs the fixes the rules allow. `llm.js` also has an adapter for the Anthropic API if you would rather use that model provider.
 - **PayPal REST APIs** (sandbox), listed above.
+- **Render Workflows** (`@renderinc/sdk`) for the deep prevention scan: parallel tasks on separate instances, with retries.
 - **Node.js and Express**, with Server-Sent Events to stream the agent's steps to the browser.
 - **Frontend:** plain HTML, CSS and JavaScript, with hand-drawn SVG charts and icons and no build step.
 
@@ -111,11 +128,20 @@ To start over in sandbox mode, run both seed commands again.
 | `GROQ_MODEL` | no | Defaults to `openai/gpt-oss-120b` |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | for real PayPal calls | Sandbox app credentials. Without them, the offline mock is used |
 | `PAYPAL_MODE` | no | `mock` forces the offline mock even with credentials |
+| `RENDER_API_KEY` | for Render Workflows | Lets the web app start workflow runs (Render Account Settings > API Keys) |
+| `WORKFLOW_SERVICE_SLUG` | for Render Workflows | The workflow service slug, `unhold-workflows` in `render.yaml` |
 | `PORT` | no | Defaults to 3000 (`.env.example` uses 3333) |
 
 ## Deploying
 
-`render.yaml` sets up a free Render web service. In Render, choose **New → Blueprint**, pick this repo, and set `GROQ_API_KEY` (plus the PayPal variables if you have them). The free plan's disk is temporary, so the demo data resets on restart.
+`render.yaml` is a Render Blueprint with two services: the web app (`unhold`) and the workflow service (`unhold-workflows`).
+
+1. In Render, choose **New → Blueprint** and pick this repo.
+2. Set `GROQ_API_KEY` on both services, plus `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` on the web app if you have them.
+3. Create a Render API key (**Account Settings → API Keys**) and set it as `RENDER_API_KEY` on the web app.
+4. If Render gives the workflow a different slug than `unhold-workflows`, update `WORKFLOW_SERVICE_SLUG` to match.
+
+The web service's disk is temporary, so the demo data resets on restart.
 
 ## Project layout
 
@@ -128,6 +154,8 @@ paypal.js     PayPal REST client and offline mock
 audit.js      append-only audit log
 demo.js       demo shop seeding and reset
 seed.js       sandbox seeding script
+scan.js       deep prevention scan (Render Workflows or in-process)
+workflows/    Render Workflow tasks (main.js) and their shared logic (core.js)
 public/       frontend
 data/         simulated 30-day shop history
 ```
