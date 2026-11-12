@@ -32,7 +32,7 @@ code { background:var(--surface-2); border:1px solid var(--line); padding:1px 5p
 .sidebar { position:sticky; top:0; height:100vh; width:var(--sbw); flex:none; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; transition:width .18s ease; z-index:40; }
 .sb-top { display:flex; align-items:center; justify-content:space-between; padding:16px 14px 12px 18px; gap:8px; }
 .wordmark { display:flex; align-items:center; gap:10px; color:var(--brand); font-weight:700; font-size:18px; letter-spacing:-.02em; text-decoration:none !important; overflow:hidden; white-space:nowrap; }
-.logo { width:32px; height:32px; border-radius:8px; background:var(--brand); color:#fff; justify-content:center; flex:none; }
+.logo { width:32px; height:32px; border-radius:8px; flex:none; display:block; object-fit:contain; }
 .nav { display:flex; flex-direction:column; gap:2px; padding:8px 10px; flex:1; }
 .nav a { display:flex; align-items:center; gap:12px; padding:9px 10px; border-radius:8px; color:var(--ink-2); font-weight:500; text-decoration:none; white-space:nowrap; overflow:hidden; position:relative; }
 .nav a:hover { background:var(--surface-2); }
