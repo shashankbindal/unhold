@@ -67,15 +67,20 @@ function groqSession(system, tools, userMessage) {
   return {
     async next() {
       let r, j;
-      for (let attempt = 0; attempt < 4; attempt++) {
+      for (let attempt = 0; attempt < 6; attempt++) {
         r = await fetch(`${base}/chat/completions`, {
           method: "POST",
           headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model, messages, tools: fnTools, tool_choice: "auto", temperature: 0.2, max_completion_tokens: 8000, reasoning_effort: process.env.GROQ_REASONING || "low" }),
         });
         j = await r.json().catch(() => ({}));
-        if (r.status !== 429 && r.status < 500) break;
-        const wait = Math.min(20, Number(r.headers.get("retry-after")) || 2 ** attempt * 2);
+        // gpt-oss occasionally emits a malformed tool call (e.g. a tool named "commentary"); Groq rejects it with
+        // 400 tool_use_failed. Sampling again usually succeeds.
+        const malformedToolCall = r.status === 400 && j?.error?.code === "tool_use_failed";
+        if (r.status !== 429 && r.status < 500 && !malformedToolCall) break;
+        // Free-tier TPM limits are tight (the deep scan's root-cause calls share the key): honor "try again in Xs".
+        const hint = Number(/try again in ([\d.]+)s/.exec(j?.error?.message || "")?.[1]);
+        const wait = Math.min(30, Number(r.headers.get("retry-after")) || (hint ? hint + 1 : 2 ** attempt * 2));
         await new Promise((ok) => setTimeout(ok, wait * 1000));
       }
       if (!r.ok) throw new Error(`Groq ${r.status}: ${JSON.stringify(j).slice(0, 300)}`);
