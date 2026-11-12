@@ -314,3 +314,13 @@ details.payload pre { margin:10px 0 0; max-height:320px; overflow:auto; backgrou
   .page-head { align-items:flex-start; }
 }
 .tbl td.mono { white-space:nowrap; }
+
+/* deep scan */
+.hm-tbl td.num, .hm-tbl th.num { text-align:center; }
+.hm { display:inline-block; min-width:44px; padding:4px 0; border-radius:6px; font-weight:700; font-variant-numeric:tabular-nums; }
+.hm.high { background:var(--bad-soft); color:var(--bad); } .hm.medium { background:var(--warn-soft); color:var(--warn); } .hm.low { background:var(--ok-soft); color:var(--ok); }
+.ds-meta { margin-bottom:10px; }
+.ds-take { display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border-radius:10px; background:var(--brand-soft, #eef4ff); margin-bottom:12px; font-size:13.5px; }
+.ds-h3 { font-size:14px; margin:18px 0 6px; }
+.ds-rc { padding:10px 0; border-top:1px solid var(--line); }
+.ds-rc blockquote { margin:6px 0; padding:6px 10px; border-left:3px solid var(--accent, #0070E0); background:var(--surface-2); font-size:13px; font-style:italic; }

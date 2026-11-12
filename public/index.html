@@ -106,6 +106,12 @@
       <!-- FORECAST -->
       <section class="page" id="page-forecast" data-title="Forecast" hidden>
         <div class="page-head"><div><h1>Forecast</h1><p class="lede">See how fixes and sales growth move your hold risk, using the same rules the agent uses.</p></div></div>
+        <div class="card" id="deepScan">
+          <div class="card-h"><div><h2>Deep prevention scan</h2><div class="muted small">Every fix combination against sales growth, plus AI root cause per problem product. Fans out as parallel tasks on Render Workflows, with automatic retries.</div></div>
+            <button class="btn primary" id="dsRun"><span class="spin"></span><span class="run-ic" data-icon="play"></span><span id="dsRunTxt">Run deep scan</span></button></div>
+          <div id="dsWhere" style="margin-bottom:10px"></div>
+          <div id="dsOut"><div class="empty">Run the scan to see which fixes keep you safe as sales grow.</div></div>
+        </div>
         <div class="card"><div class="card-h"><h2>Risk per order, before and after the agent</h2><span class="muted small" id="ordersChartNote">Hollow dot = before, filled = now</span></div><div id="chartOrders" class="chart"><div class="skel" style="height:220px"></div></div></div>
         <div class="grid-2">
           <div class="card">
@@ -200,5 +206,6 @@
 <script src="icons.js"></script>
 <script src="charts.js"></script>
 <script src="app.js"></script>
+<script src="deepscan.js"></script>
 </body>
 </html>
